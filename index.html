@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fernando Martins Pimenta // Geospatial Solutions Architect</title>
+  <meta name="description" content="Fernando Martins Pimenta — Geospatial Solutions Architect. AIOps · DevOps · Solution Engineer · Cartographer · Data Scientist. Ecossistemas geoespaciais enterprise e digital twins." />
+  <meta name="author" content="Fernando Martins Pimenta" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Fernando Martins Pimenta // Geospatial Solutions Architect" />
+  <meta property="og:description" content="Arquiteto de soluções geoespaciais enterprise, digital twins e infraestrutura cloud-native." />
+  <meta property="og:image" content="https://avatars.githubusercontent.com/u/25591167?v=4" />
+  <meta property="og:url" content="https://pimentafm.github.io" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:creator" content="@fern_pimenta" />
+  <link rel="icon" href="https://avatars.githubusercontent.com/u/25591167?v=4" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #04070d;
+      --bg-soft: #070c15;
+      --panel: rgba(12, 20, 33, 0.55);
+      --panel-solid: #0a1120;
+      --border: rgba(56, 189, 248, 0.14);
+      --border-hot: rgba(56, 189, 248, 0.55);
+      --text: #dbe8f5;
+      --text-dim: #7d93ac;
+      --text-faint: #4a5b70;
+      --cyan: #22d3ee;
+      --green: #34d399;
+      --amber: #fbbf24;
+      --glow: rgba(34, 211, 238, 0.35);
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+      --sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --maxw: 1180px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    ::selection { background: var(--cyan); color: #04070d; }
+
+    /* ---- Canvas globe background ---- */
+    #globe {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .bg-veil {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(34,211,238,0.10), transparent 55%),
+        radial-gradient(ellipse at 80% 90%, rgba(52,211,153,0.08), transparent 50%),
+        linear-gradient(180deg, rgba(4,7,13,0) 60%, rgba(4,7,13,0.85) 100%);
+    }
+    /* scanlines */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg, rgba(255,255,255,0.018) 0px, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 3px);
+      mix-blend-mode: overlay;
+    }
+
+    .content { position: relative; z-index: 3; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+    /* ---------- BOOT OVERLAY ---------- */
+    #boot {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+    }
+    #boot.done { opacity: 0; visibility: hidden; }
+    .boot-box {
+      width: min(620px, 90vw);
+      padding: 26px 28px;
+      border: 1px solid var(--border-hot);
+      border-radius: 10px;
+      background: rgba(8,14,24,0.9);
+      box-shadow: 0 0 40px rgba(34,211,238,0.15), inset 0 0 30px rgba(34,211,238,0.04);
+    }
+    .boot-box .bh {
+      color: var(--text-faint);
+      font-size: 0.72rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .boot-line { font-size: 0.82rem; color: var(--green); white-space: pre-wrap; min-height: 1.4em; }
+    .boot-line .ok { color: var(--cyan); }
+    .boot-line .warn { color: var(--amber); }
+    .cursor { display: inline-block; width: 9px; height: 1em; background: var(--cyan); vertical-align: -2px; animation: blink 1s steps(2) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ---------- HUD FRAME ---------- */
+    .hud-corner {
+      position: fixed;
+      width: 26px; height: 26px;
+      border: 1px solid var(--border-hot);
+      z-index: 4;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    .hud-corner.tl { top: 16px; left: 16px; border-right: 0; border-bottom: 0; }
+    .hud-corner.tr { top: 16px; right: 16px; border-left: 0; border-bottom: 0; }
+    .hud-corner.bl { bottom: 16px; left: 16px; border-right: 0; border-top: 0; }
+    .hud-corner.br { bottom: 16px; right: 16px; border-left: 0; border-top: 0; }
+
+    /* ---------- NAV ---------- */
+    nav {
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      background: rgba(4,7,13,0.6);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .brand { font-family: var(--mono); font-weight: 700; font-size: 0.92rem; display: flex; align-items: center; gap: 9px; }
+    .brand .blip {
+      width: 9px; height: 9px; border-radius: 50%; background: var(--green);
+      box-shadow: 0 0 10px var(--green); animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.4;transform:scale(.7);} }
+    .brand span.dim { color: var(--text-faint); }
+    .nav-links { display: flex; gap: 26px; font-family: var(--mono); font-size: 0.82rem; }
+    .nav-links a { color: var(--text-dim); transition: color .2s; position: relative; }
+    .nav-links a::before { content: "› "; color: var(--cyan); opacity: 0; transition: opacity .2s; }
+    .nav-links a:hover { color: var(--cyan); }
+    .nav-links a:hover::before { opacity: 1; }
+    @media (max-width: 680px){ .nav-links { display: none; } }
+
+    /* ---------- HERO ---------- */
+    header { padding: 80px 0 60px; }
+    .hero { display: grid; grid-template-columns: 150px 1fr; gap: 42px; align-items: center; }
+    .avatar-hex { position: relative; width: 150px; height: 150px; }
+    .avatar-hex img {
+      width: 100%; height: 100%; object-fit: cover;
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      position: relative; z-index: 2;
+    }
+    .avatar-hex::before, .avatar-hex::after {
+      content: ""; position: absolute; inset: -5px;
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      background: linear-gradient(135deg, var(--cyan), var(--green));
+      z-index: 1;
+    }
+    .avatar-hex::after { inset: -10px; opacity: 0.25; filter: blur(6px); animation: pulse 3s infinite; z-index: 0; }
+
+    .tagchip {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.15em;
+      color: var(--cyan); text-transform: uppercase;
+      border: 1px solid var(--border-hot); border-radius: 30px;
+      padding: 5px 14px; margin-bottom: 18px;
+      background: rgba(34,211,238,0.06);
+    }
+    .tagchip .blip { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+
+    .hero h1 {
+      font-size: clamp(2rem, 5.5vw, 3.3rem);
+      line-height: 1.05; letter-spacing: -0.03em; font-weight: 700; margin-bottom: 14px;
+    }
+    .hero h1 .grad {
+      background: linear-gradient(120deg, var(--cyan), var(--green));
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .typewrap {
+      font-family: var(--mono); font-size: clamp(0.95rem, 2.4vw, 1.15rem);
+      color: var(--text); margin-bottom: 22px; min-height: 1.6em;
+    }
+    .typewrap .pre { color: var(--green); }
+    .type { color: var(--cyan); }
+    .type-cursor { display: inline-block; width: 8px; height: 1.05em; background: var(--cyan); vertical-align: -2px; margin-left: 2px; animation: blink 1s steps(2) infinite; }
+
+    .hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 26px; }
+    .meta-pill {
+      font-family: var(--mono); font-size: 0.78rem; color: var(--text-dim);
+      border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px;
+      background: var(--panel); backdrop-filter: blur(6px);
+    }
+    .meta-pill b { color: var(--text); font-weight: 500; }
+
+    .socials { display: flex; flex-wrap: wrap; gap: 10px; }
+    .social-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 16px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--panel);
+      backdrop-filter: blur(6px); font-family: var(--mono);
+      font-size: 0.82rem; color: var(--text); transition: all .2s;
+    }
+    .social-btn svg { width: 15px; height: 15px; }
+    .social-btn:hover {
+      border-color: var(--border-hot); color: var(--cyan);
+      transform: translateY(-2px); box-shadow: 0 0 20px rgba(34,211,238,0.18);
+    }
+    .social-btn.primary { background: linear-gradient(120deg, var(--cyan), var(--green)); color: #04070d; border-color: transparent; font-weight: 700; }
+    .social-btn.primary:hover { color: #04070d; box-shadow: 0 0 28px var(--glow); }
+
+    @media (max-width: 700px) {
+      .hero { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+      .hero-meta, .socials { justify-content: center; }
+    }
+
+    /* ---------- SECTIONS ---------- */
+    section { padding: 64px 0; position: relative; }
+    .section-head { margin-bottom: 40px; }
+    .section-head .kicker {
+      font-family: var(--mono); color: var(--green); font-size: 0.78rem;
+      letter-spacing: 0.15em; text-transform: uppercase; display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    }
+    .section-head .kicker::before { content: ""; width: 28px; height: 1px; background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .section-head h2 { font-size: clamp(1.6rem, 4vw, 2.2rem); letter-spacing: -0.02em; font-weight: 600; }
+    .section-head p { color: var(--text-dim); margin-top: 10px; max-width: 660px; }
+
+    /* ---------- ABOUT ---------- */
+    .about-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 36px; }
+    .term {
+      border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+      background: rgba(6,11,20,0.75); backdrop-filter: blur(8px);
+    }
+    .term-bar {
+      display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+      border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.72rem; color: var(--text-faint);
+    }
+    .term-bar .d { width: 11px; height: 11px; border-radius: 50%; }
+    .term-bar .d.r{background:#ff5f57;} .term-bar .d.y{background:#febc2e;} .term-bar .d.g{background:#28c840;}
+    .term-bar .path { margin-left: 8px; }
+    .term-body { padding: 20px 22px; font-size: 0.94rem; }
+    .term-body p { color: var(--text-dim); margin-bottom: 14px; }
+    .term-body p::before { content: "$ "; color: var(--green); font-family: var(--mono); }
+    .term-body strong { color: var(--cyan); font-weight: 500; }
+    .term-body a { color: var(--green); border-bottom: 1px dashed var(--green); }
+
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-content: start; }
+    .stat {
+      border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+      background: var(--panel); backdrop-filter: blur(8px); transition: all .25s; position: relative; overflow: hidden;
+    }
+    .stat::after {
+      content: ""; position: absolute; top: 0; right: 0; width: 40px; height: 40px;
+      background: radial-gradient(circle at top right, var(--glow), transparent 70%); opacity: 0; transition: opacity .25s;
+    }
+    .stat:hover { border-color: var(--border-hot); transform: translateY(-3px); }
+    .stat:hover::after { opacity: 1; }
+    .stat .num { font-family: var(--mono); font-size: 1.9rem; font-weight: 700; color: var(--cyan); line-height: 1; text-shadow: 0 0 18px var(--glow); }
+    .stat .lbl { color: var(--text-dim); font-size: 0.78rem; margin-top: 8px; font-family: var(--mono); }
+    @media (max-width: 720px){ .about-grid { grid-template-columns: 1fr; } }
+
+    /* ---------- SKILLS ---------- */
+    .skills-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .skill-card {
+      border: 1px solid var(--border); border-radius: 12px; padding: 22px;
+      background: var(--panel); backdrop-filter: blur(8px); transition: all .25s; position: relative;
+    }
+    .skill-card:hover { transform: translateY(-4px); border-color: var(--border-hot); box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+    .skill-card h3 { font-family: var(--mono); font-size: 0.9rem; margin-bottom: 16px; display: flex; align-items: center; gap: 9px; color: var(--text); }
+    .skill-card h3 .ico { font-size: 1.15rem; filter: drop-shadow(0 0 6px var(--glow)); }
+    .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+    .chip {
+      font-family: var(--mono); font-size: 0.74rem; color: var(--text-dim);
+      background: rgba(34,211,238,0.04); border: 1px solid var(--border);
+      padding: 4px 9px; border-radius: 6px; transition: all .15s;
+    }
+    .chip:hover { color: var(--cyan); border-color: var(--border-hot); box-shadow: 0 0 12px rgba(34,211,238,0.15); }
+
+    /* ---------- PROJECTS ---------- */
+    .proj-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 18px; }
+    .proj-card {
+      border: 1px solid var(--border); border-radius: 12px; padding: 24px;
+      background: var(--panel); backdrop-filter: blur(8px);
+      display: flex; flex-direction: column; transition: all .25s; position: relative; overflow: hidden;
+    }
+    .proj-card::before {
+      content: ""; position: absolute; inset: 0; padding: 1px; border-radius: 12px;
+      background: linear-gradient(120deg, var(--cyan), var(--green)); opacity: 0;
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude; transition: opacity .3s;
+    }
+    .proj-card:hover { transform: translateY(-5px); box-shadow: 0 16px 44px rgba(0,0,0,0.55); }
+    .proj-card:hover::before { opacity: 1; }
+    .proj-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .proj-id { font-family: var(--mono); font-size: 0.72rem; color: var(--text-faint); letter-spacing: 0.1em; }
+    .proj-top .star { color: var(--amber); font-size: 0.78rem; font-family: var(--mono); display: flex; align-items: center; gap: 4px; }
+    .proj-card h3 { font-family: var(--mono); font-size: 1.02rem; margin-bottom: 10px; color: var(--text); letter-spacing: -0.01em; }
+    .proj-card:hover h3 { color: var(--cyan); }
+    .proj-card p { color: var(--text-dim); font-size: 0.88rem; flex-grow: 1; margin-bottom: 18px; }
+    .proj-foot { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 0.76rem; color: var(--text-faint); }
+    .lang-dot { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 8px currentColor; }
+    .proj-foot .arrow { margin-left: auto; color: var(--cyan); opacity: 0; transform: translateX(-6px); transition: all .25s; }
+    .proj-card:hover .proj-foot .arrow { opacity: 1; transform: none; }
+
+    /* ---------- CARREIRA (experience + formation) ---------- */
+    .carreira-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 44px; align-items: start; }
+    @media (max-width: 860px) { .carreira-grid { grid-template-columns: 1fr; gap: 40px; } }
+    .sub-h {
+      font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--green); margin-bottom: 22px; display: flex; align-items: center; gap: 10px;
+    }
+    .sub-h::before { content: ""; width: 22px; height: 1px; background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+    .exp-list { position: relative; padding-left: 28px; }
+    .exp-list::before { content: ""; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 1px; background: linear-gradient(180deg, var(--cyan), var(--green) 60%, transparent); }
+    .exp { position: relative; padding-bottom: 26px; }
+    .exp:last-child { padding-bottom: 0; }
+    .exp::before {
+      content: ""; position: absolute; left: -28px; top: 4px; width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid var(--cyan); background: var(--bg); box-shadow: 0 0 10px var(--glow); transition: all .25s;
+    }
+    .exp.now::before { border-color: var(--green); background: var(--green); box-shadow: 0 0 14px var(--green); animation: pulse 2s infinite; }
+    .exp:hover::before { transform: scale(1.2); }
+    .exp .org { font-family: var(--mono); font-size: 0.98rem; color: var(--text); font-weight: 500; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .exp .now-badge { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.1em; color: var(--green); border: 1px solid var(--green); border-radius: 20px; padding: 2px 8px; }
+    .exp .role { font-family: var(--mono); font-size: 0.8rem; color: var(--cyan); margin: 4px 0 7px; }
+    .exp p { color: var(--text-dim); font-size: 0.85rem; margin: 0; }
+
+    .edu { border: 1px solid var(--border); border-radius: 11px; padding: 16px 18px; background: var(--panel); backdrop-filter: blur(8px); margin-bottom: 12px; transition: all .25s; }
+    .edu:last-child { margin-bottom: 0; }
+    .edu:hover { border-color: var(--border-hot); transform: translateX(4px); }
+    .edu .eyr { font-family: var(--mono); font-size: 0.72rem; color: var(--cyan); letter-spacing: 0.04em; }
+    .edu h4 { font-size: 0.92rem; color: var(--text); font-weight: 500; line-height: 1.35; margin: 5px 0 4px; }
+    .edu .inst { font-family: var(--mono); font-size: 0.75rem; color: var(--text-dim); }
+
+    /* ---------- FEITOS (achievement cards) ---------- */
+    .feat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+    .feat-card {
+      border: 1px solid var(--border); border-radius: 14px; padding: 26px;
+      background: var(--panel); backdrop-filter: blur(8px); transition: all .25s; position: relative; overflow: hidden;
+    }
+    .feat-card::before {
+      content: ""; position: absolute; inset: 0; padding: 1px; border-radius: 14px;
+      background: linear-gradient(120deg, var(--cyan), var(--green)); opacity: 0;
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude; transition: opacity .3s;
+    }
+    .feat-card:hover { transform: translateY(-5px); box-shadow: 0 16px 44px rgba(0,0,0,.5); }
+    .feat-card:hover::before { opacity: 1; }
+    .feat-card .ficon { font-size: 1.7rem; display: block; margin-bottom: 14px; filter: drop-shadow(0 0 10px var(--glow)); }
+    .feat-card .fstat { font-family: var(--mono); font-size: 1.55rem; font-weight: 700; color: var(--cyan); text-shadow: 0 0 18px var(--glow); line-height: 1; margin-bottom: 8px; }
+    .feat-card h3 { font-size: 1rem; color: var(--text); margin-bottom: 10px; letter-spacing: -0.01em; }
+    .feat-card p { color: var(--text-dim); font-size: 0.88rem; }
+
+    /* ---------- RESEARCH (publications timeline) ---------- */
+    .pub-list { display: flex; flex-direction: column; gap: 14px; }
+    .pub {
+      display: grid; grid-template-columns: 92px 1fr; gap: 22px; align-items: start;
+      border: 1px solid var(--border); border-radius: 12px; padding: 22px 24px;
+      background: var(--panel); backdrop-filter: blur(8px); transition: all .25s; position: relative; overflow: hidden;
+    }
+    .pub::before {
+      content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+      background: linear-gradient(180deg, var(--cyan), var(--green)); transform: scaleY(0); transform-origin: top; transition: transform .3s;
+    }
+    .pub:hover { border-color: var(--border-hot); transform: translateX(5px); }
+    .pub:hover::before { transform: scaleY(1); }
+    .pub .yr { text-align: right; border-right: 1px solid var(--border); padding-right: 20px; }
+    .pub .yr .num { font-family: var(--mono); font-size: 1.55rem; font-weight: 700; color: var(--cyan); text-shadow: 0 0 16px var(--glow); line-height: 1; }
+    .pub .yr .kind { font-family: var(--mono); font-size: 0.62rem; color: var(--text-faint); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 8px; }
+    .pub .venue {
+      display: inline-block; font-family: var(--mono); font-size: 0.7rem; color: var(--green);
+      border: 1px solid var(--border); border-radius: 5px; padding: 3px 9px; margin-bottom: 10px; background: rgba(52,211,153,.05);
+    }
+    .pub h3 { font-size: 1rem; font-weight: 500; line-height: 1.42; color: var(--text); margin-bottom: 10px; }
+    .pub .ref {
+      font-family: var(--mono); font-size: 0.74rem; color: var(--text-dim);
+      display: inline-flex; align-items: center; gap: 7px; transition: color .2s;
+    }
+    a.ref:hover { color: var(--cyan); }
+    a.ref:hover .arrow { transform: translate(2px,-2px); }
+    .pub .ref .arrow { transition: transform .2s; }
+    @media (max-width: 560px) {
+      .pub { grid-template-columns: 1fr; gap: 12px; }
+      .pub .yr { text-align: left; border-right: 0; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: 12px; display: flex; align-items: baseline; gap: 12px; }
+      .pub .yr .kind { margin-top: 0; }
+    }
+
+    .cta-row { text-align: center; margin-top: 42px; }
+
+    /* ---------- FOOTER ---------- */
+    footer { border-top: 1px solid var(--border); padding: 44px 0; text-align: center; }
+    footer .socials { justify-content: center; margin-bottom: 22px; }
+    footer .status {
+      font-family: var(--mono); font-size: 0.78rem; color: var(--text-faint);
+      display: inline-flex; align-items: center; gap: 9px; margin-bottom: 14px;
+    }
+    footer .status .blip { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 2s infinite; }
+    footer .copy { font-family: var(--mono); font-size: 0.78rem; color: var(--text-faint); }
+
+    /* Reveal */
+    .reveal { opacity: 0; transform: translateY(26px); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1 !important; transform: none !important; }
+      .avatar-hex::after, .brand .blip, .type-cursor, .cursor { animation: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="globe"></canvas>
+  <div class="bg-veil"></div>
+  <div class="scanlines"></div>
+  <div class="hud-corner tl"></div><div class="hud-corner tr"></div>
+  <div class="hud-corner bl"></div><div class="hud-corner br"></div>
+
+  <!-- BOOT SEQUENCE -->
+  <div id="boot">
+    <div class="boot-box">
+      <div class="bh"><span>GEOSPATIAL_CORE // BOOT</span><span id="bootPct">00%</span></div>
+      <div class="boot-line" id="bootLine"></div>
+    </div>
+  </div>
+
+  <div class="content">
+    <nav>
+      <div class="wrap">
+        <div class="brand"><span class="blip"></span> pimentafm<span class="dim">@geo:~$</span></div>
+        <div class="nav-links">
+          <a href="#about">whoami</a>
+          <a href="#carreira">carreira</a>
+          <a href="#feitos">feitos</a>
+          <a href="#research">research</a>
+          <a href="#skills">stack</a>
+        </div>
+      </div>
+    </nav>
+
+    <header>
+      <div class="wrap">
+        <div class="hero reveal">
+          <div class="avatar-hex">
+            <img src="https://avatars.githubusercontent.com/u/25591167?v=4" alt="Fernando Martins Pimenta" />
+          </div>
+          <div class="hero-body">
+            <div class="tagchip"><span class="blip"></span> System Online · Brazil · UTC-3</div>
+            <h1>Fernando <span class="grad">Pimenta</span></h1>
+            <div class="typewrap"><span class="pre">role@geo &gt;</span> <span class="type" id="type"></span><span class="type-cursor"></span></div>
+            <div class="hero-meta">
+              <div class="meta-pill">now: <b>Solutis · Serasa Experian</b></div>
+              <div class="meta-pill">focus: <b>Data · AI · Digital Twin</b></div>
+              <div class="meta-pill">orcid: <b>0000-0002-7589-5721</b></div>
+            </div>
+            <div class="socials">
+              <a class="social-btn primary" href="https://github.com/pimentafm" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.8c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 016 0C17 4.7 18 5 18 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+                github
+              </a>
+              <a class="social-btn" href="https://www.linkedin.com/in/fernando-m-pimenta/" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 2h-17A1.5 1.5 0 002 3.5v17A1.5 1.5 0 003.5 22h17a1.5 1.5 0 001.5-1.5v-17A1.5 1.5 0 0020.5 2zM8 19H5v-9h3zM6.5 8.3a1.7 1.7 0 110-3.4 1.7 1.7 0 010 3.4zM19 19h-3v-4.7c0-1.1 0-2.5-1.5-2.5S13 12.9 13 14.2V19h-3v-9h2.9v1.2h.05a3.2 3.2 0 012.9-1.6c3 0 3.6 2 3.6 4.6z"/></svg>
+                linkedin
+              </a>
+              <a class="social-btn" href="https://x.com/fern_pimenta" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7.5 8.6L23 22h-6.6l-5.2-6.8L5.3 22H2.2l8-9.2L1.5 2h6.8l4.7 6.2zm-1.2 18h1.7L7.2 3.8H5.4z"/></svg>
+                x
+              </a>
+              <a class="social-btn" href="https://orcid.org/0000-0002-7589-5721" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zM7.4 18H5.5V7.9h1.9V18zM6.4 6.7a1.1 1.1 0 110-2.2 1.1 1.1 0 010 2.2zM18.5 13.4c0 2.9-1.9 4.6-4.7 4.6H9.9V7.9h3.9c2.8 0 4.7 1.7 4.7 5.5zm-1.9 0c0-2.5-1.2-3.5-3-3.5h-1.8v7h1.8c1.6 0 3-1 3-3.5z"/></svg>
+                orcid
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section id="about">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <span class="kicker">whoami</span>
+          <h2>Enterprise geospatial, do pixel ao cluster</h2>
+        </div>
+        <div class="about-grid reveal">
+          <div class="term">
+            <div class="term-bar">
+              <span class="d r"></span><span class="d y"></span><span class="d g"></span>
+              <span class="path">~/fernando/profile.sh</span>
+            </div>
+            <div class="term-body">
+              <p><strong>Engenheiro Agrimensor e Cartógrafo</strong> (UFV) e <strong>MBA em Ciência de Dados &amp; IA</strong> (USP), com trajetória que une geociências, computação de alto desempenho e engenharia de software.</p>
+              <p>Da <strong>EMBRAPA</strong> ao grupo de pesquisa <strong>Interação Atmosfera-Biosfera</strong> da UFV, desenvolvi sistemas de geoprocessamento, sensoriamento remoto, <strong>machine learning</strong> e webgis em colaboração com CNPq, World Bank, AIBA, INPUT e Agroicone.</p>
+              <p>Hoje atuo em <strong>engenharia de dados e software</strong> na <strong>Solutis · Serasa Experian</strong>, aplicando <strong>digital twins</strong> e IA em escala enterprise. Entusiasta de <strong>open source</strong> para resolver desafios reais.</p>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="num" data-count="6" data-suffix="">0</div><div class="lbl">publicações</div></div>
+            <div class="stat"><div class="num" data-count="5" data-suffix="">0</div><div class="lbl">periódicos int.</div></div>
+            <div class="stat"><div class="num" data-count="74" data-suffix="yr">0</div><div class="lbl">dataset BHALU</div></div>
+            <div class="stat"><div class="num" data-static="∞">∞</div><div class="lbl">impacto</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="carreira">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <span class="kicker">cat career.log</span>
+          <h2>Trajetória &amp; Formação</h2>
+          <p>Da pesquisa em geociências à engenharia de dados e digital twins em escala enterprise.</p>
+        </div>
+        <div class="carreira-grid reveal">
+          <div>
+            <div class="sub-h">experiência</div>
+            <div class="exp-list" id="expList"></div>
+          </div>
+          <div>
+            <div class="sub-h">formação acadêmica</div>
+            <div id="eduList"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="feitos">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <span class="kicker">achievements.log</span>
+          <h2>Feitos &amp; Impacto</h2>
+          <p>Ciência aplicada, plataformas em produção e reconhecimento em geoprocessamento ambiental.</p>
+        </div>
+        <div class="feat-grid" id="featGrid"></div>
+      </div>
+    </section>
+
+    <section id="research">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <span class="kicker">grep -i publications</span>
+          <h2>Publicações &amp; Pesquisa</h2>
+          <p>Artigos peer-reviewed em periódicos internacionais, livro técnico e datasets de escala nacional.</p>
+        </div>
+        <div class="pub-list" id="pubList"></div>
+        <div class="cta-row reveal">
+          <a class="social-btn primary" href="https://orcid.org/0000-0002-7589-5721" target="_blank" rel="noopener">
+            ver perfil completo no ORCID →
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section id="skills">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <span class="kicker">stack.load()</span>
+          <h2>Ferramentas &amp; Tecnologias</h2>
+          <p>Do pixel de satélite ao cluster Kubernetes.</p>
+        </div>
+        <div class="skills-grid">
+          <div class="skill-card reveal">
+            <h3><span class="ico">🛰️</span> Geospatial</h3>
+            <div class="chips">
+              <span class="chip">Google Earth Engine</span><span class="chip">GRASS GIS</span><span class="chip">SAGA GIS</span>
+              <span class="chip">QGIS</span><span class="chip">MapServer</span><span class="chip">PostGIS</span><span class="chip">GeoServer</span><span class="chip">netCDF</span>
+            </div>
+          </div>
+          <div class="skill-card reveal">
+            <h3><span class="ico">⚙️</span> Languages</h3>
+            <div class="chips">
+              <span class="chip">Python</span><span class="chip">Fortran 90</span><span class="chip">Shell Script</span>
+              <span class="chip">TypeScript</span><span class="chip">Go</span><span class="chip">NCL</span><span class="chip">R</span>
+            </div>
+          </div>
+          <div class="skill-card reveal">
+            <h3><span class="ico">🌐</span> Web &amp; Cloud</h3>
+            <div class="chips">
+              <span class="chip">Node.js</span><span class="chip">Next.js</span><span class="chip">React</span>
+              <span class="chip">PostgreSQL</span><span class="chip">AWS</span><span class="chip">Azure</span><span class="chip">Docker</span><span class="chip">Linux</span>
+            </div>
+          </div>
+          <div class="skill-card reveal">
+            <h3><span class="ico">📡</span> Data &amp; AI</h3>
+            <div class="chips">
+              <span class="chip">Data Science</span><span class="chip">Machine Learning</span><span class="chip">LSTM / RNN</span>
+              <span class="chip">Big Data</span><span class="chip">Sensoriamento Remoto</span><span class="chip">Digital Twins</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <div class="status"><span class="blip"></span> ALL SYSTEMS OPERATIONAL</div>
+        <div class="socials">
+          <a class="social-btn" href="https://github.com/pimentafm" target="_blank" rel="noopener">github</a>
+          <a class="social-btn" href="https://www.linkedin.com/in/fernando-m-pimenta/" target="_blank" rel="noopener">linkedin</a>
+          <a class="social-btn" href="https://x.com/fern_pimenta" target="_blank" rel="noopener">x</a>
+          <a class="social-btn" href="https://sciagri.tech" target="_blank" rel="noopener">sciagri.tech</a>
+        </div>
+        <p class="copy">© <span id="year"></span> Fernando Martins Pimenta · rendered on GitHub Pages · 60fps</p>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+  (function(){
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* ============ WIREFRAME GLOBE ============ */
+    const canvas = document.getElementById('globe');
+    const ctx = canvas.getContext('2d');
+    let W, H, DPR, cx, cy, R;
+    const points = [];
+    // build sphere point grid (lat/long)
+    for (let lat = -80; lat <= 80; lat += 10) {
+      const rad = lat * Math.PI / 180;
+      const circ = Math.cos(rad);
+      const n = Math.max(6, Math.round(circ * 36));
+      for (let i = 0; i < n; i++) {
+        const lon = (i / n) * Math.PI * 2;
+        points.push({
+          x: circ * Math.cos(lon),
+          y: Math.sin(rad),
+          z: circ * Math.sin(lon)
+        });
+      }
+    }
+    // orbiting satellites
+    const sats = Array.from({length: 5}, (_, i) => ({
+      a: (i / 5) * Math.PI * 2,
+      inc: (i - 2) * 0.5,
+      r: 1.35 + i * 0.06,
+      spd: 0.004 + i * 0.0009
+    }));
+
+    function resize(){
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      W = canvas.clientWidth; H = canvas.clientHeight;
+      canvas.width = W * DPR; canvas.height = H * DPR;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      cx = W * 0.5;
+      cy = H * (W < 760 ? 0.30 : 0.46);
+      R = Math.min(W, H) * (W < 760 ? 0.42 : 0.34);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    let rot = 0;
+    function project(p, r){
+      // rotate around Y then tilt on X
+      const cosT = Math.cos(rot), sinT = Math.sin(rot);
+      let x = p.x * cosT - p.z * sinT;
+      let z = p.x * sinT + p.z * cosT;
+      let y = p.y;
+      const tilt = 0.42;
+      const y2 = y * Math.cos(tilt) - z * Math.sin(tilt);
+      const z2 = y * Math.sin(tilt) + z * Math.cos(tilt);
+      return { sx: cx + x * r, sy: cy + y2 * r, depth: z2 };
+    }
+
+    function frame(){
+      ctx.clearRect(0, 0, W, H);
+      // outer ring
+      ctx.strokeStyle = 'rgba(34,211,238,0.10)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 1.06, 0, Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, R * 1.14, 0, Math.PI*2); ctx.strokeStyle='rgba(52,211,153,0.06)'; ctx.stroke();
+
+      // globe points
+      for (const p of points){
+        const pr = project(p, R);
+        const front = pr.depth > 0;
+        const b = (pr.depth + 1) / 2; // 0..1
+        const size = 0.6 + b * 1.7;
+        ctx.beginPath();
+        ctx.arc(pr.sx, pr.sy, size, 0, Math.PI*2);
+        if (front){
+          ctx.fillStyle = `rgba(34,211,238,${0.15 + b*0.65})`;
+        } else {
+          ctx.fillStyle = `rgba(52,211,153,${0.05 + b*0.12})`;
+        }
+        ctx.fill();
+      }
+
+      // faint connection arcs between some front points
+      ctx.strokeStyle = 'rgba(34,211,238,0.05)';
+      ctx.lineWidth = 0.6;
+      for (let i = 0; i < points.length; i += 17){
+        const a = project(points[i], R);
+        const b = project(points[(i*7) % points.length], R);
+        if (a.depth > 0 && b.depth > 0){
+          ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+        }
+      }
+
+      // satellites
+      for (const s of sats){
+        s.a += s.spd;
+        const p = {
+          x: Math.cos(s.a) * s.r,
+          y: Math.sin(s.inc) * 0.5,
+          z: Math.sin(s.a) * s.r
+        };
+        const pr = project(p, R);
+        const front = pr.depth > 0;
+        ctx.beginPath();
+        ctx.arc(pr.sx, pr.sy, front ? 2.6 : 1.4, 0, Math.PI*2);
+        ctx.fillStyle = front ? 'rgba(251,191,36,0.9)' : 'rgba(251,191,36,0.25)';
+        ctx.fill();
+        if (front){
+          ctx.beginPath();
+          ctx.arc(pr.sx, pr.sy, 6, 0, Math.PI*2);
+          ctx.strokeStyle = 'rgba(251,191,36,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+        }
+      }
+
+      if (!reduce) rot += 0.0016;
+      requestAnimationFrame(frame);
+    }
+    frame();
+
+    /* ============ BOOT SEQUENCE ============ */
+    const bootLines = [
+      ['> init geospatial_core.service', 'ok'],
+      ['> mounting /satellite/feeds ......... ', 'OK'],
+      ['> loading digital_twin engine ...... ', 'OK'],
+      ['> connecting PostGIS + GeoServer ... ', 'OK'],
+      ['> calibrating projection EPSG:4326 . ', 'OK'],
+      ['> deploying k8s render cluster ..... ', 'OK'],
+      ['> user: Fernando M. Pimenta ........ ', 'AUTH'],
+      ['> welcome, architect.', '']
+    ];
+    const bootEl = document.getElementById('bootLine');
+    const bootPct = document.getElementById('bootPct');
+    const bootBox = document.getElementById('boot');
+    let bi = 0, buf = '';
+
+    function typeBoot(){
+      if (bi >= bootLines.length){
+        setTimeout(() => {
+          bootBox.classList.add('done');
+          document.body.style.overflow = '';
+          startReveal();
+          startType();
+        }, 350);
+        return;
+      }
+      const [txt, tag] = bootLines[bi];
+      let cls = 'ok';
+      if (tag === 'AUTH') cls = 'warn';
+      const tagHtml = tag ? `<span class="${cls}">[ ${tag} ]</span>` : '';
+      buf += txt + (tag ? ` ` : '') ;
+      bootEl.innerHTML = buf.replace(/\n/g,'<br>') + tagHtml + '<span class="cursor"></span>';
+      bootEl.innerHTML = buf + tagHtml;
+      // rebuild full log
+      let full = '';
+      for (let k = 0; k <= bi; k++){
+        const [t, g] = bootLines[k];
+        let c = g === 'AUTH' ? 'warn' : 'ok';
+        full += t + (g ? ` <span class="${c}">[ ${g} ]</span>` : '') + '\n';
+      }
+      bootEl.innerHTML = full + '<span class="cursor"></span>';
+      bootPct.textContent = String(Math.round(((bi+1)/bootLines.length)*100)).padStart(2,'0') + '%';
+      bi++;
+      setTimeout(typeBoot, reduce ? 60 : (180 + Math.random()*140));
+    }
+    if (reduce){
+      bootBox.classList.add('done');
+      startRevealDeferred();
+    } else {
+      document.body.style.overflow = 'hidden';
+      setTimeout(typeBoot, 300);
+    }
+    function startRevealDeferred(){ startReveal(); startType(); }
+
+    /* ============ TYPEWRITER ROLES ============ */
+    const roles = [
+      'Geospatial Solutions Architect',
+      'Pesquisador Publicado · 5+ artigos',
+      'Specialist Cartographer Engineer',
+      'AIOps / DevOps · Data Engineer',
+      'Digital Twin Builder'
+    ];
+    const typeEl = document.getElementById('type');
+    let ri = 0, ci = 0, deleting = false, started = false;
+    function startType(){ if (started) return; started = true; tick(); }
+    function tick(){
+      const word = roles[ri];
+      if (!deleting){
+        typeEl.textContent = word.slice(0, ++ci);
+        if (ci === word.length){ deleting = true; return setTimeout(tick, 1600); }
+      } else {
+        typeEl.textContent = word.slice(0, --ci);
+        if (ci === 0){ deleting = false; ri = (ri+1) % roles.length; }
+      }
+      setTimeout(tick, deleting ? 35 : 70);
+    }
+
+    /* ============ COUNTERS + REVEAL ============ */
+    function animateCount(el){
+      const target = +el.dataset.count;
+      const suffix = el.dataset.suffix || '';
+      let cur = 0;
+      const step = Math.max(1, Math.round(target / 34));
+      const iv = setInterval(() => {
+        cur += step;
+        if (cur >= target){ cur = target; clearInterval(iv); }
+        el.textContent = cur + suffix;
+      }, 26);
+    }
+    let revealStarted = false;
+    function startReveal(){
+      if (revealStarted) return; revealStarted = true;
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting){
+            e.target.classList.add('in');
+            e.target.querySelectorAll?.('[data-count]').forEach(animateCount);
+            io.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.12 });
+      document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+    }
+
+    /* ============ CARREIRA (experience + formation) ============ */
+    const experience = [
+      { org:"Solutis · Serasa Experian", role:"Engenharia de Dados & Software", now:true, desc:"Desenvolvimento de soluções de dados e software em ambiente enterprise de alta escala." },
+      { org:"PhDSoft", role:"Líder de Engenharia", desc:"Aplicações que integram gêmeos digitais (digital twins) e inteligência artificial." },
+      { org:"GE21 Geotecnologias", role:"Coordenador de Sistemas de Informação", desc:"Infraestruturas de dados espaciais (IDE), projetos de IA, DevOps, FullCycle e arquitetura de software." },
+      { org:"Grupo Interação Atmosfera-Biosfera · UFV", role:"Pesquisador", desc:"Computação paralela, geoprocessamento, sensoriamento remoto, ML e webgis — colaborações com CNPq, World Bank, AIBA, INPUT e Agroicone." },
+      { org:"EMBRAPA Milho e Sorgo", role:"Técnico Científico", desc:"Concepção e desenvolvimento do Geoportal Embrapa Milho e Sorgo." }
+    ];
+    const expList = document.getElementById('expList');
+    experience.forEach((e, i) => {
+      const el = document.createElement('div');
+      el.className = 'exp reveal' + (e.now ? ' now' : '');
+      el.style.transitionDelay = (i * 50) + 'ms';
+      el.innerHTML = `
+        <div class="org">${e.org}${e.now ? '<span class="now-badge">NOW</span>' : ''}</div>
+        <div class="role">${e.role}</div>
+        <p>${e.desc}</p>`;
+      expList.appendChild(el);
+    });
+
+    const education = [
+      { yr:"2024 — 2025", deg:"Especialização em Computação e Tecnologia da Informação", inst:"Faculdade Full Cycle" },
+      { yr:"2021 — 2022", deg:"MBA em Data Science & Analytics", inst:"Universidade de São Paulo · USP" },
+      { yr:"2013 — 2020", deg:"Graduação · Engenharia de Agrimensura e Cartográfica", inst:"Universidade Federal de Viçosa · UFV" },
+      { yr:"2009 — 2011", deg:"Graduação · Engenharia de Biossistemas", inst:"Univ. Federal de São João Del-Rei · UFSJ" }
+    ];
+    const eduList = document.getElementById('eduList');
+    education.forEach((e, i) => {
+      const el = document.createElement('div');
+      el.className = 'edu reveal';
+      el.style.transitionDelay = (i * 50) + 'ms';
+      el.innerHTML = `
+        <div class="eyr">${e.yr}</div>
+        <h4>${e.deg}</h4>
+        <div class="inst">${e.inst}</div>`;
+      eduList.appendChild(el);
+    });
+
+    /* ============ FEITOS (achievements) ============ */
+    const feitos = [
+      { icon:"🎓", stat:"5+ artigos", title:"Pesquisador publicado", desc:"Autor em periódicos internacionais de alto impacto — Global Change Biology, Remote Sensing, PLOS ONE, Water e Biogeosciences." },
+      { icon:"📖", stat:"Livro · Embrapa", title:"Autor técnico", desc:"“Servidores de Mapas” — programação para disponibilizar dados geográficos multidisciplinares com tecnologias livres (2012)." },
+      { icon:"🗺️", stat:"OBahia", title:"Plataforma territorial", desc:"Sistema de inteligência territorial para o Oeste da Bahia: uso do solo, biomassa, estoques de carbono e monitoramento de irrigação." },
+      { icon:"🌍", stat:"1940 – 2014", title:"Dataset nacional · BHALU", desc:"Brazilian Historical Agricultural Land Use — 74 anos de uso agrícola do solo brasileiro mapeados e disponibilizados." },
+      { icon:"🧊", stat:"1.000 anos", title:"Arctic Code Vault", desc:"Código-fonte preservado no Arctic World Archive, em Svalbard, para as próximas gerações de desenvolvedores." },
+      { icon:"⚡", stat:"×4 badges", title:"GitHub Achievements", desc:"Pull Shark ×4 · Pair Extraordinaire ×4 · Quickdraw · YOLO — colaboração e entrega contínuas em código aberto." }
+    ];
+    const featGrid = document.getElementById('featGrid');
+    feitos.forEach((f, i) => {
+      const el = document.createElement('div');
+      el.className = 'feat-card reveal';
+      el.style.transitionDelay = (i % 3 * 70) + 'ms';
+      el.innerHTML = `
+        <span class="ficon">${f.icon}</span>
+        <div class="fstat">${f.stat}</div>
+        <h3>${f.title}</h3>
+        <p>${f.desc}</p>`;
+      featGrid.appendChild(el);
+    });
+
+    /* ============ PUBLICATIONS (real, via ORCID) ============ */
+    const pubs = [
+      { year:"2021", kind:"Journal", venue:"Remote Sensing", title:"Historical Changes in Land Use and Suitability for Future Agriculture Expansion in Western Bahia, Brazil", doi:"10.3390/rs13061088" },
+      { year:"2020", kind:"Journal", venue:"PLOS ONE", title:"Carbon stocks and dynamics of different land uses on the Cerrado agricultural frontier", doi:"10.1371/journal.pone.0241637" },
+      { year:"2019", kind:"Journal", venue:"Water", title:"Climate Change and Intense Irrigation Growth in Western Bahia, Brazil: The Urgent Need for Hydroclimatic Monitoring", doi:"10.3390/w11050933" },
+      { year:"2018", kind:"Journal", venue:"Biogeosciences", title:"Influence of climate variability, fire and phosphorus limitation on vegetation structure and dynamics of the Amazon–Cerrado border", doi:"10.5194/bg-15-919-2018" },
+      { year:"2016", kind:"Journal", venue:"Global Change Biology", title:"Patterns of land use, extensification, and intensification of Brazilian agriculture", doi:"10.1111/gcb.13314" },
+      { year:"2012", kind:"Livro", venue:"Embrapa", title:"Servidores de Mapas: programação para disponibilizar dados geográficos multidisciplinares utilizando tecnologias livres", isbn:"978-85-7035-164-7" }
+    ];
+    const pubList = document.getElementById('pubList');
+    pubs.forEach((p, i) => {
+      const wrap = document.createElement(p.doi ? 'a' : 'div');
+      wrap.className = 'pub reveal';
+      if (p.doi){ wrap.href = 'https://doi.org/' + p.doi; wrap.target = '_blank'; wrap.rel = 'noopener'; }
+      wrap.style.transitionDelay = (i % 4 * 50) + 'ms';
+      const ref = p.doi
+        ? `<span class="ref">doi:${p.doi} <span class="arrow">↗</span></span>`
+        : `<span class="ref">ISBN ${p.isbn}</span>`;
+      wrap.innerHTML = `
+        <div class="yr">
+          <div class="num">${p.year}</div>
+          <div class="kind">${p.kind}</div>
+        </div>
+        <div>
+          <span class="venue">${p.venue}</span>
+          <h3>${p.title}</h3>
+          ${ref}
+        </div>`;
+      pubList.appendChild(wrap);
+    });
+
+    document.getElementById('year').textContent = new Date().getFullYear();
+  })();
+  </script>
+</body>
+</html>
